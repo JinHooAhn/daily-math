@@ -49,6 +49,7 @@ $f'(1)=22+18=40$
 | 기타 기호 | `\times` `\cdot` `\pm` `\to` `\infty` `\int` `\sum` `\pi` `\theta` |
 | 함수 | `\sin` `\cos` `\tan` `\log` `\ln` `\lim` |
 | 수식 안의 한글 | `\text{...}` |
+| 조각 함수 | `\begin{cases} x+1 & (x \le 0) \\ x^2 & (x > 0) \end{cases}` |
 
 ## 참고
 

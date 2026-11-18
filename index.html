@@ -129,6 +129,10 @@ button:focus-visible { outline: 2px solid var(--red); outline-offset: 2px; }
 .m .sqrt { display: inline-flex; align-items: flex-start; }
 .m .rad { font-size: 1.15em; line-height: 1; }
 .m .rad-body { border-top: 1px solid currentColor; margin-top: .14em; padding: 0 .12em 0 .08em; }
+.m .cases { display: inline-flex; align-items: stretch; vertical-align: middle; margin: 0 .2em; }
+.m .brace { flex: none; width: .55em; align-self: stretch; height: auto; min-height: 2.6em; margin-right: .3em; }
+.m .brace path { fill: none; stroke: currentColor; stroke-width: 1.3px; vector-effect: non-scaling-stroke; }
+.m .rows { display: grid; grid-template-columns: auto auto; column-gap: 1.1em; row-gap: .15em; align-items: center; justify-items: start; line-height: 1.5; }
 
 /* 답안 */
 .answer-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 18px; }
@@ -301,6 +305,7 @@ const SYMBOLS = { le: '≤', ge: '≥', ne: '≠', times: '×', cdot: '·', pm: 
 const OPS = new Set(['+', '−', '±', '∓', '≤', '≥', '≠', '×', '÷', '→', '≈', '·', '=', '<', '>']);
 const SIGNS = new Set(['+', '−', '±', '∓']);
 const FUNCS = new Set(['sin', 'cos', 'tan', 'sec', 'csc', 'cot', 'log', 'ln', 'lim', 'max', 'min', 'exp']);
+const BRACE = '<svg class="brace" viewBox="0 0 10 100" preserveAspectRatio="none" aria-hidden="true"><path d="M9 1C5 1 5 4 5 10L5 40C5 46 3 50 1 50C3 50 5 54 5 60L5 90C5 96 5 99 9 99"/></svg>';
 const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 function group(s, i) {
@@ -359,6 +364,15 @@ function tex(s) {
       } else if (name === 'text') {
         const a = arg();
         out += `<span class="txt">${esc(a)}</span>`;
+        last = 'atom';
+      } else if (name === 'begin') {
+        const env = arg();
+        const endTag = '\\end{' + env + '}';
+        const e = s.indexOf(endTag, i);
+        const inner = s.slice(i, e < 0 ? s.length : e);
+        i = e < 0 ? s.length : e + endTag.length;
+        const rows = env === 'cases' ? inner.split('\\\\').filter(r => r.trim()) : [];
+        out += rows.length ? '<span class="cases">' + BRACE + '<span class="rows">' + rows.map(r => { const c = r.split('&'); return '<span>' + tex(c[0]) + '</span><span>' + tex(c[1] || '') + '</span>'; }).join('') + '</span></span>' : '';
         last = 'atom';
       } else if (name === 'left' || name === 'right') {
         /* 크기 지정은 무시 */
