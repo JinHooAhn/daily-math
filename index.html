@@ -108,6 +108,9 @@ button:focus-visible { outline: 2px solid var(--red); outline-offset: 2px; }
 .cond { border: 1px solid var(--ink); padding: 10px 14px; margin: 14px 0 6px; }
 .pts { text-align: right; font-size: .9em; margin-top: 6px !important; }
 .figure:not(:empty) { margin-top: 16px; display: flex; justify-content: center; overflow-x: auto; }
+.figure img { max-width: 100%; height: auto; }
+.state { margin: 0; color: var(--muted); font: 400 16px/1.7 var(--sans); }
+.pad.is-off { opacity: .4; pointer-events: none; }
 
 .sol-head { font: 700 14px/1.4 var(--sans); letter-spacing: .2em; padding-bottom: 8px; border-bottom: 1px solid var(--ink); margin-bottom: 12px; }
 .sol-body { font: 400 17px/1.95 var(--serif); }
@@ -259,43 +262,36 @@ button:focus-visible { outline: 2px solid var(--red); outline-offset: 2px; }
 (function () {
 'use strict';
 
-/* ───────────── 문제 입력 ─────────────
-   날짜별로 문제를 적습니다.
-   키는 "YYYY-MM-DD"(그 해에만) 또는 "MM-DD"(매년 반복)입니다.
-   등록하지 않은 날짜에는 아래 sampleProblem(m, n)의 예시 문제가 나옵니다.
-
-   stem, conditions, solution 안에서 $ 와 $ 로 감싼 부분은 수식입니다.
-     거듭제곱 x^2, x^{10}     아래첨자 a_n     분수 \frac{a}{b}     근호 \sqrt{x}
-     미분 f'(x)     부등호 \le \ge \ne     \times \cdot \pm \to \infty \int \sum \pi \theta
-     \sin \cos \tan \log \ln \lim     수식 안의 한글은 \text{...}
-   역슬래시는 문자열 안에서 두 번 적습니다. 예: "$\\frac{1}{2}$"
-   줄 바꿈은 \n 입니다.
-   answer 는 0 이상 999 이하의 정수입니다(수능 단답형과 같은 범위).
-
-   예)
-   "2026-11-19": {
-     points: 3,
-     stem: "...",
-     conditions: ["(가) ...", "(나) ..."],   // 선택: 조건 상자
-     figure: "<svg ...></svg>",              // 선택: 그림
-     answer: 12,
-     solution: "..."                          // 선택: 풀이
-   }
-*/
-const PROBLEMS = {
-};
+/* ───────────── 문제 파일 ─────────────
+   문제는 problems/YYYY-MM-DD.txt 에 하루에 하나씩 적습니다. 형식은 README.md 를 보세요. */
 
 // 이 날짜부터 지난 문제를 다시 풀어 볼 수 있습니다.
 const LAUNCH_DATE = '2026-11-01';
 
-// 등록되지 않은 날짜의 예시 문제: m월 n일 → f(x) = m x² + n x, 답은 f'(1) = 2m + n
-function sampleProblem(m, n) {
-  const a = 2 * m;
+class ProblemError extends Error {}
+
+function parseProblem(text) {
+  const parts = String(text).replace(/^﻿/, '').replace(/\r\n?/g, '\n').split(/^---[ \t]*$/m);
+  const head = {};
+  (parts[0] || '').split('\n').forEach(l => {
+    const m = /^\s*([A-Za-z]+)\s*:\s*(.*?)\s*$/.exec(l);
+    if (m) head[m[1].toLowerCase()] = m[2];
+  });
+  if (!/^\d{1,3}$/.test(head.answer || '')) throw new ProblemError('answer 는 0~999 사이의 정수');
+  const stem = [], conditions = [];
+  (parts[1] || '').split('\n').forEach(l => {
+    const t = l.trim();
+    if (!t) return;
+    if (t[0] === '>') conditions.push(t.replace(/^>\s?/, '')); else stem.push(t);
+  });
+  if (!stem.length) throw new ProblemError('문제 본문이 비어 있음');
   return {
-    points: 3,
-    stem: `함수 $f(x)=${m}x^2+${n}x$에 대하여 $f'(1)$의 값은?`,
-    answer: a + n,
-    solution: `$f'(x)=${a}x+${n}$ 이므로\n$f'(1)=${a}+${n}=${a + n}$`
+    points: parseInt(head.points, 10) || 0,
+    answer: parseInt(head.answer, 10),
+    stem: stem.join('\n'),
+    conditions,
+    figure: head.figure || '',
+    solution: parts.slice(2).join('\n---\n').trim()
   };
 }
 
@@ -464,38 +460,64 @@ function keyFromHash() {
   if (h < firstDay()) return firstDay();
   return h;
 }
-function getProblem(key) {
-  const p = parseKey(key);
-  return PROBLEMS[key] || PROBLEMS[`${pad(p.mo)}-${pad(p.d)}`] || sampleProblem(p.mo, p.d);
-}
+let seq = 0;
 
-function show(key) {
+async function show(key) {
+  const my = ++seq;
   cur = key;
-  problem = getProblem(key);
+  problem = null;
+  status = 'idle';
+  digits = '';
+  tries = 0;
+  note = '';
   const p = parseKey(key);
+  $('dateMain').textContent = `${p.mo}월 ${p.d}일`;
+  $('dateSub').textContent = `${p.y}년 ${WD[p.wd]}요일` + (key === today ? ' · 오늘' : '');
+  $('no').textContent = `${p.d}.`;
+  $('body').innerHTML = '<p class="state">문제를 불러오는 중…</p>';
+  $('figure').textContent = '';
+  draw();
+
+  let data = null, why = '';
+  try {
+    const res = await fetch(`problems/${key}.txt`, { cache: 'no-cache' });
+    if (res.status === 404) why = '이 날의 문제는 아직 준비되지 않았어요.';
+    else if (!res.ok) why = '문제를 불러오지 못했어요. 잠시 뒤에 다시 열어 주세요.';
+    else data = parseProblem(await res.text());
+  } catch (e) {
+    why = e instanceof ProblemError ? `문제 파일의 형식을 확인해 주세요. (${e.message})` : '문제를 불러오지 못했어요. 인터넷 연결을 확인해 주세요.';
+  }
+  if (my !== seq) return;
+  if (!data) {
+    $('body').innerHTML = `<p class="state">${esc(why)}</p>`;
+    draw();
+    return;
+  }
+
+  problem = data;
   const rec = records()[key] || {};
   tries = rec.tries || 0;
   status = rec.solved ? 'solved' : 'idle';
   digits = rec.solved ? String(problem.answer) : '';
-  note = '';
-
-  $('dateMain').textContent = `${p.mo}월 ${p.d}일`;
-  $('dateSub').textContent = `${p.y}년 ${WD[p.wd]}요일` + (key === today ? ' · 오늘' : '');
-  $('no').textContent = `${p.d}.`;
 
   let h = lines(problem.stem);
-  if (problem.conditions && problem.conditions.length) h += `<div class="cond">${problem.conditions.map(c => `<p>${rich(c)}</p>`).join('')}</div>`;
+  if (problem.conditions.length) h += `<div class="cond">${problem.conditions.map(c => `<p>${rich(c)}</p>`).join('')}</div>`;
   if (problem.points) h += `<p class="pts">[${problem.points}점]</p>`;
   $('body').innerHTML = h;
-  $('figure').innerHTML = problem.figure || '';
+  if (problem.figure) {
+    const im = new Image();
+    im.src = problem.figure;
+    im.alt = '문제 그림';
+    $('figure').appendChild(im);
+  }
   $('solBody').innerHTML = problem.solution ? lines(problem.solution) : '<p>해설이 준비되지 않았습니다.</p>';
   $('doneAns').textContent = problem.answer;
-
   draw();
   tick();
 }
 
 function message() {
+  if (!problem) return '';
   if (note) return note;
   if (status === 'solved') return tries <= 1 ? '정답입니다. 한 번에 맞혔어요.' : `정답입니다. ${tries}번째 시도에 맞혔어요.`;
   if (status === 'wrong') return `틀렸어요. 다시 풀어 보세요. · 시도 ${tries}회`;
@@ -515,6 +537,7 @@ function draw() {
 
   const solved = status === 'solved';
   $('pad').hidden = solved;
+  $('pad').classList.toggle('is-off', !problem);
   $('done').hidden = !solved;
   $('solution').hidden = !solved;
   $('nextLine').hidden = cur !== today;
@@ -528,7 +551,7 @@ function draw() {
 }
 
 function submit() {
-  if (status === 'solved') return;
+  if (!problem || status === 'solved') return;
   if (!digits) { note = '답을 입력해 주세요.'; draw(); return; }
   const all = records();
   const r = all[cur] || { tries: 0, solved: false };
@@ -554,7 +577,7 @@ function submit() {
 }
 
 function press(k) {
-  if (status === 'solved') return;
+  if (!problem || status === 'solved') return;
   note = '';
   if (k === 'ok') { submit(); return; }
   if (k === 'del') {
