@@ -1,0 +1,607 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>데일리 수학</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&family=Noto+Serif+KR:wght@400;600&family=STIX+Two+Text:ital,wght@0,400;0,600;1,400&display=swap">
+<style>
+/* 레이아웃: 시험지(문제)는 왼쪽, 답안 입력과 키패드는 오른쪽. 좁은 화면에서는 한 열로 쌓는다. */
+:root {
+  --desk: #E6E9ED;
+  --paper: #FCFCFD;
+  --ink: #15181D;
+  --muted: #5A6270;
+  --line: #CBD1D9;
+  --key: #FFFFFF;
+  --key-down: #DDE1E7;
+  --red: #D3362D;
+  --on-red: #FFFFFF;
+  --serif: "Noto Serif KR", "Batang", "Nanum Myeongjo", serif;
+  --sans: "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  --math: "STIX Two Text", "Times New Roman", serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --desk: #0F1216;
+    --paper: #171B21;
+    --ink: #E9EBEE;
+    --muted: #9AA3B0;
+    --line: #2B323C;
+    --key: #1E242C;
+    --key-down: #2A323C;
+    --red: #FF6A5F;
+    --on-red: #190B0A;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --desk: #0F1216;
+  --paper: #171B21;
+  --ink: #E9EBEE;
+  --muted: #9AA3B0;
+  --line: #2B323C;
+  --key: #1E242C;
+  --key-down: #2A323C;
+  --red: #FF6A5F;
+  --on-red: #190B0A;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html, body { min-height: 100%; }
+body {
+  margin: 0;
+  background: var(--desk);
+  color: var(--ink);
+  font: 400 16px/1.5 var(--sans);
+  padding-block: 20px 36px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.app { max-width: 980px; margin: 0 auto; }
+button { font-family: inherit; }
+button:focus-visible { outline: 2px solid var(--red); outline-offset: 2px; }
+
+/* 상단 */
+.top { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.brand { margin: 0; font: 700 15px/1.4 var(--sans); letter-spacing: .14em; }
+.streak { font-size: 13px; border: 1px solid var(--line); background: var(--paper); padding: 3px 10px; }
+.streak b { color: var(--red); font-variant-numeric: tabular-nums; }
+
+.daynav { display: flex; align-items: center; justify-content: center; gap: 18px; margin: 14px 0 20px; }
+.navbtn {
+  width: 44px; height: 44px; border: 1px solid var(--line); background: var(--paper); color: var(--ink);
+  font-size: 24px; line-height: 1; border-radius: 6px; cursor: pointer; touch-action: manipulation;
+}
+.navbtn:disabled { opacity: .3; cursor: default; }
+.dateblock { min-width: 150px; text-align: center; }
+.date { margin: 0; font: 700 30px/1.25 var(--sans); }
+.date-sub { color: var(--muted); font-size: 14px; }
+
+/* 문제 영역 */
+.board {
+  display: grid; gap: 16px;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: "paper" "answer" "solution";
+}
+.paper { grid-area: paper; min-width: 0; background: var(--paper); border: 1px solid var(--line); padding: 22px 24px 26px; }
+.answer { grid-area: answer; min-width: 0; background: var(--paper); border: 1px solid var(--line); padding: 20px; }
+.solution { grid-area: solution; min-width: 0; background: var(--paper); border: 1px solid var(--line); padding: 18px 24px 22px; }
+@media (min-width: 820px) {
+  .board {
+    grid-template-columns: minmax(0, 1.55fr) minmax(300px, 1fr);
+    grid-template-areas: "paper answer" "solution answer";
+    align-items: start;
+  }
+  .answer { position: sticky; top: 16px; }
+}
+
+.paper-head { display: flex; justify-content: space-between; align-items: center; padding-bottom: 10px; border-bottom: 3px double var(--ink); margin-bottom: 22px; }
+.subject { font-weight: 700; font-size: 14px; letter-spacing: .2em; }
+.kind { font-size: 12px; border: 1px solid var(--ink); padding: 2px 8px; letter-spacing: .08em; }
+.item { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 12px; }
+.no { font: 700 22px/1.55 var(--sans); font-variant-numeric: tabular-nums; }
+.item-body { font: 400 19px/2 var(--serif); }
+.item-body p, .sol-body p { margin: 0; }
+.item-body p + p { margin-top: .2em; }
+.cond { border: 1px solid var(--ink); padding: 10px 14px; margin: 14px 0 6px; }
+.pts { text-align: right; font-size: .9em; margin-top: 6px !important; }
+.figure:not(:empty) { margin-top: 16px; display: flex; justify-content: center; overflow-x: auto; }
+
+.sol-head { font: 700 14px/1.4 var(--sans); letter-spacing: .2em; padding-bottom: 8px; border-bottom: 1px solid var(--ink); margin-bottom: 12px; }
+.sol-body { font: 400 17px/1.95 var(--serif); }
+
+/* 수식 */
+.m { font-family: var(--math); font-size: 1.1em; }
+.m i { font-style: italic; }
+.m sup, .m sub { font-size: .72em; line-height: 0; }
+.m .bin { margin: 0 .22em; }
+.m .thin { display: inline-block; width: .17em; }
+.m .fn { font-style: normal; margin-right: .12em; }
+.m .txt { font-family: var(--serif); font-size: .88em; }
+.m .frac { display: inline-flex; flex-direction: column; vertical-align: middle; text-align: center; margin: 0 .15em; font-size: .95em; }
+.m .frac .num { border-bottom: 1px solid currentColor; padding: 0 .2em; line-height: 1.35; }
+.m .frac .den { padding: 0 .2em; line-height: 1.35; }
+.m .sqrt { display: inline-flex; align-items: flex-start; }
+.m .rad { font-size: 1.15em; line-height: 1; }
+.m .rad-body { border-top: 1px solid currentColor; margin-top: .14em; padding: 0 .12em 0 .08em; }
+
+/* 답안 */
+.answer-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 18px; }
+.answer-head h3 { margin: 0; font: 700 14px/1.4 var(--sans); letter-spacing: .2em; }
+.answer-head span { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+
+.slots-wrap { position: relative; margin-block: 14px; color: var(--ink); }
+.slots { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; max-width: 300px; margin-inline: auto; }
+.slot {
+  position: relative; aspect-ratio: 1 / 1.1; max-width: 100%;
+  border: 1.5px solid var(--ink); background: var(--key);
+  display: grid; place-items: center;
+}
+.slot-label { position: absolute; top: 5px; left: 7px; font-size: 11px; color: var(--muted); }
+.slot-digit { font: 400 44px/1 var(--math); font-variant-numeric: lining-nums; }
+.is-wrong .slot { border-color: var(--red); }
+.is-wrong .slot-digit { color: var(--red); }
+
+.mark { position: absolute; left: -5%; width: 110%; top: 50%; transform: translateY(-50%); aspect-ratio: 3 / 1; color: var(--red); pointer-events: none; opacity: 0; overflow: visible; }
+.mark path { stroke-dasharray: 1; stroke-dashoffset: 1; }
+.is-solved .mark { opacity: 1; }
+.is-solved .mark path { animation: draw .7s .05s ease-out forwards; }
+.is-wrong .slots { animation: shake .35s; }
+@keyframes draw { to { stroke-dashoffset: 0; } }
+@keyframes shake { 20% { transform: translateX(-6px); } 40% { transform: translateX(5px); } 60% { transform: translateX(-3px); } 80% { transform: translateX(2px); } }
+@media (prefers-reduced-motion: reduce) {
+  .is-wrong .slots { animation: none; }
+  .is-solved .mark path { animation: none; stroke-dashoffset: 0; }
+}
+
+.msg { min-height: 1.7em; margin: 8px 0 0; text-align: center; font-size: 14px; color: var(--muted); }
+.is-wrong + .msg { color: var(--red); }
+.is-solved + .msg { color: var(--ink); font-weight: 500; }
+
+.pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; max-width: 300px; margin: 14px auto 0; }
+.pad button {
+  min-height: 60px; border: 1px solid var(--line); background: var(--key); color: var(--ink);
+  font: 500 24px/1 var(--sans); border-radius: 6px; cursor: pointer;
+  touch-action: manipulation; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none;
+}
+.pad button:active { background: var(--key-down); transform: translateY(1px); }
+.pad .fn { font-size: 15px; color: var(--muted); }
+.pad .ok { background: var(--red); border-color: var(--red); color: var(--on-red); font-size: 17px; font-weight: 700; }
+.pad .ok:active { filter: brightness(.92); background: var(--red); }
+
+.done { text-align: center; margin-top: 14px; }
+.done-ans { font-size: 14px; color: var(--muted); }
+.done-ans b { font: 600 28px/1.3 var(--math); color: var(--ink); margin-left: 6px; }
+.next { margin: 10px 0 0; font-size: 14px; color: var(--muted); }
+.next b { color: var(--ink); font-variant-numeric: tabular-nums; }
+.linkbtn { margin-top: 12px; border: 1px solid var(--ink); background: var(--key); color: var(--ink); padding: 10px 18px; font-size: 15px; border-radius: 6px; cursor: pointer; touch-action: manipulation; }
+
+.foot { margin: 22px 0 0; text-align: center; color: var(--muted); font-size: 13px; }
+:root { color-scheme: light; }
+[hidden] { display: none !important; }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header class="top">
+    <h1 class="brand">데일리 수학</h1>
+    <div class="streak" id="streak" hidden>연속 <b id="streakN">0</b>일</div>
+  </header>
+
+  <nav class="daynav" aria-label="날짜 이동">
+    <button type="button" class="navbtn" id="prev" aria-label="이전 날">‹</button>
+    <div class="dateblock">
+      <h2 class="date" id="dateMain">&nbsp;</h2>
+      <div class="date-sub" id="dateSub">&nbsp;</div>
+    </div>
+    <button type="button" class="navbtn" id="next" aria-label="다음 날">›</button>
+  </nav>
+
+  <main class="board">
+    <section class="paper" aria-label="문제">
+      <div class="paper-head"><span class="subject">수학 영역</span><span class="kind">단답형</span></div>
+      <div class="item">
+        <div class="no" id="no"></div>
+        <div class="item-body" id="body"></div>
+      </div>
+      <div class="figure" id="figure"></div>
+    </section>
+
+    <section class="answer" aria-label="정답 입력">
+      <div class="answer-head"><h3>정답 입력</h3><span>0 ~ 999</span></div>
+      <div class="slots-wrap" id="slotsWrap">
+        <div class="slots" id="slots" role="group" aria-label="입력한 답 없음">
+          <div class="slot"><span class="slot-label">백</span><span class="slot-digit"></span></div>
+          <div class="slot"><span class="slot-label">십</span><span class="slot-digit"></span></div>
+          <div class="slot"><span class="slot-label">일</span><span class="slot-digit"></span></div>
+        </div>
+        <svg class="mark" viewBox="0 0 300 100" aria-hidden="true">
+          <path d="M262 20 C 214 4, 92 4, 40 24 C 4 40, 8 76, 60 88 C 116 100, 214 98, 262 80 C 296 66, 296 34, 250 16 C 236 11, 222 9, 208 8" pathLength="1" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <p class="msg" id="msg" role="status" aria-live="polite"></p>
+
+      <div class="pad" id="pad">
+        <button type="button" data-k="1" aria-label="1">1</button>
+        <button type="button" data-k="2" aria-label="2">2</button>
+        <button type="button" data-k="3" aria-label="3">3</button>
+        <button type="button" data-k="4" aria-label="4">4</button>
+        <button type="button" data-k="5" aria-label="5">5</button>
+        <button type="button" data-k="6" aria-label="6">6</button>
+        <button type="button" data-k="7" aria-label="7">7</button>
+        <button type="button" data-k="8" aria-label="8">8</button>
+        <button type="button" data-k="9" aria-label="9">9</button>
+        <button type="button" data-k="del" class="fn" aria-label="한 자리 지우기">지우기</button>
+        <button type="button" data-k="0" aria-label="0">0</button>
+        <button type="button" data-k="ok" class="ok" aria-label="정답 제출">제출</button>
+      </div>
+
+      <div class="done" id="done" hidden>
+        <div class="done-ans">정답<b id="doneAns"></b></div>
+        <p class="next" id="nextLine">다음 문제까지 <b id="cd">--:--:--</b></p>
+        <button type="button" class="linkbtn" id="toToday" hidden>오늘 문제 풀기</button>
+      </div>
+    </section>
+
+    <section class="solution" id="solution" aria-label="해설" hidden>
+      <div class="sol-head">해설</div>
+      <div class="sol-body" id="solBody"></div>
+    </section>
+  </main>
+
+  <p class="foot">새 문제는 매일 0시(한국 시간)에 열립니다.</p>
+</div>
+
+<script>
+(function () {
+'use strict';
+
+/* ───────────── 문제 입력 ─────────────
+   날짜별로 문제를 적습니다.
+   키는 "YYYY-MM-DD"(그 해에만) 또는 "MM-DD"(매년 반복)입니다.
+   등록하지 않은 날짜에는 아래 sampleProblem(m, n)의 예시 문제가 나옵니다.
+
+   stem, conditions, solution 안에서 $ 와 $ 로 감싼 부분은 수식입니다.
+     거듭제곱 x^2, x^{10}     아래첨자 a_n     분수 \frac{a}{b}     근호 \sqrt{x}
+     미분 f'(x)     부등호 \le \ge \ne     \times \cdot \pm \to \infty \int \sum \pi \theta
+     \sin \cos \tan \log \ln \lim     수식 안의 한글은 \text{...}
+   역슬래시는 문자열 안에서 두 번 적습니다. 예: "$\\frac{1}{2}$"
+   줄 바꿈은 \n 입니다.
+   answer 는 0 이상 999 이하의 정수입니다(수능 단답형과 같은 범위).
+
+   예)
+   "2026-11-19": {
+     points: 3,
+     stem: "...",
+     conditions: ["(가) ...", "(나) ..."],   // 선택: 조건 상자
+     figure: "<svg ...></svg>",              // 선택: 그림
+     answer: 12,
+     solution: "..."                          // 선택: 풀이
+   }
+*/
+const PROBLEMS = {
+};
+
+// 이 날짜부터 지난 문제를 다시 풀어 볼 수 있습니다.
+const LAUNCH_DATE = '2026-11-01';
+
+// 등록되지 않은 날짜의 예시 문제: m월 n일 → f(x) = m x² + n x, 답은 f'(1) = 2m + n
+function sampleProblem(m, n) {
+  const a = 2 * m;
+  return {
+    points: 3,
+    stem: `함수 $f(x)=${m}x^2+${n}x$에 대하여 $f'(1)$의 값은?`,
+    answer: a + n,
+    solution: `$f'(x)=${a}x+${n}$ 이므로\n$f'(1)=${a}+${n}=${a + n}$`
+  };
+}
+
+/* ───────────── 수식 표기 ───────────── */
+/*TEX-START*/
+const SYMBOLS = { le: '≤', ge: '≥', ne: '≠', times: '×', cdot: '·', pm: '±', mp: '∓', div: '÷', to: '→', infty: '∞', int: '∫', sum: 'Σ', pi: 'π', theta: 'θ', alpha: 'α', beta: 'β', ldots: '…', approx: '≈', degree: '°' };
+const OPS = new Set(['+', '−', '±', '∓', '≤', '≥', '≠', '×', '÷', '→', '≈', '·', '=', '<', '>']);
+const SIGNS = new Set(['+', '−', '±', '∓']);
+const FUNCS = new Set(['sin', 'cos', 'tan', 'sec', 'csc', 'cot', 'log', 'ln', 'lim', 'max', 'min', 'exp']);
+const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+function group(s, i) {
+  let d = 0;
+  for (let j = i; j < s.length; j++) {
+    if (s[j] === '{') d++;
+    else if (s[j] === '}') { d--; if (d === 0) return [s.slice(i + 1, j), j + 1]; }
+  }
+  return [s.slice(i + 1), s.length];
+}
+
+function tex(s) {
+  let out = '', i = 0, last = 'start'; // start | atom | op | open
+  const op = ch => {
+    if (SIGNS.has(ch) && last !== 'atom') out += ch;
+    else out += `<span class="bin">${esc(ch)}</span>`;
+    last = 'op';
+  };
+  const arg = () => {
+    while (s[i] === ' ') i++;
+    if (s[i] === '{') { const r = group(s, i); i = r[1]; return r[0]; }
+    const m = /^(?:[0-9]+|[a-zA-Z]|\\[a-zA-Z]+|[\s\S])/.exec(s.slice(i));
+    const t = m ? m[0] : '';
+    i += t.length;
+    return t;
+  };
+  while (i < s.length) {
+    const c = s[i];
+    if (c === ' ' || c === '\n') { i++; continue; }
+    if (c === '^' || c === '_') {
+      i++;
+      const a = arg();
+      const tag = c === '^' ? 'sup' : 'sub';
+      out += `<${tag}>${tex(a)}</${tag}>`;
+      continue;
+    }
+    if (c === '\\') {
+      const m = /^[a-zA-Z]+/.exec(s.slice(i + 1));
+      if (!m) {
+        const n = s[i + 1] || '';
+        i += 2;
+        if (n === ',' || n === ' ' || n === ';') out += '<span class="thin"></span>';
+        else if (n) { out += esc(n); last = 'atom'; }
+        continue;
+      }
+      const name = m[0];
+      i += 1 + name.length;
+      if (name === 'frac') {
+        const a = arg(), b = arg();
+        out += `<span class="frac"><span class="num">${tex(a)}</span><span class="den">${tex(b)}</span></span>`;
+        last = 'atom';
+      } else if (name === 'sqrt') {
+        const a = arg();
+        out += `<span class="sqrt"><span class="rad">√</span><span class="rad-body">${tex(a)}</span></span>`;
+        last = 'atom';
+      } else if (name === 'text') {
+        const a = arg();
+        out += `<span class="txt">${esc(a)}</span>`;
+        last = 'atom';
+      } else if (name === 'left' || name === 'right') {
+        /* 크기 지정은 무시 */
+      } else if (FUNCS.has(name)) {
+        out += `<span class="fn">${name}</span>`;
+        last = 'open';
+      } else if (SYMBOLS[name]) {
+        const sy = SYMBOLS[name];
+        if (OPS.has(sy)) op(sy); else { out += sy; last = 'atom'; }
+      } else {
+        out += esc(name);
+        last = 'atom';
+      }
+      continue;
+    }
+    if (c === '-') op('−');
+    else if (c === '+' || c === '=' || c === '<' || c === '>') op(c);
+    else if (c === '*') op('·');
+    else if (/[a-zA-Z]/.test(c)) { out += `<i>${c}</i>`; last = 'atom'; }
+    else if (c === "'") out += '′';
+    else if (c === '(' || c === '[') { out += c; last = 'open'; }
+    else if (c === ',') { out += ',<span class="thin"></span>'; last = 'open'; }
+    else if (c === '/') { out += '/'; last = 'op'; }
+    else { out += esc(c); if (/[0-9)\].]/.test(c)) last = 'atom'; }
+    i++;
+  }
+  return out;
+}
+
+function rich(t) {
+  return String(t).split('$').map((p, k) => k % 2 ? `<span class="m">${tex(p)}</span>` : esc(p)).join('');
+}
+const lines = t => String(t).split('\n').map(l => `<p>${rich(l)}</p>`).join('');
+/*TEX-END*/
+
+/* ───────────── 날짜 ───────────── */
+/*DATE-START*/
+const WD = ['일', '월', '화', '수', '목', '금', '토'];
+const pad = n => String(n).padStart(2, '0');
+
+function todayKST() {
+  const p = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date());
+  const g = t => p.find(x => x.type === t).value;
+  return `${g('year')}-${g('month')}-${g('day')}`;
+}
+function secsToMidnightKST() {
+  const p = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' }).formatToParts(new Date());
+  const g = t => +p.find(x => x.type === t).value;
+  return 86400 - (g('hour') * 3600 + g('minute') * 60 + g('second'));
+}
+function parseKey(k) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(k);
+  if (!m) return null;
+  const y = +m[1], mo = +m[2], d = +m[3];
+  const dt = new Date(Date.UTC(y, mo - 1, d));
+  if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== mo - 1 || dt.getUTCDate() !== d) return null;
+  return { y, mo, d, wd: dt.getUTCDay() };
+}
+function shift(k, delta) {
+  const p = parseKey(k);
+  const dt = new Date(Date.UTC(p.y, p.mo - 1, p.d + delta));
+  return `${dt.getUTCFullYear()}-${pad(dt.getUTCMonth() + 1)}-${pad(dt.getUTCDate())}`;
+}
+/*DATE-END*/
+
+/* ───────────── 기록(이 기기에만 저장) ───────────── */
+const STORE = 'daily-math-records-v1';
+let mem = null;
+function records() {
+  if (mem) return mem;
+  try { mem = JSON.parse(localStorage.getItem(STORE) || '{}') || {}; } catch (e) { mem = {}; }
+  return mem;
+}
+function saveRecords() { try { localStorage.setItem(STORE, JSON.stringify(mem)); } catch (e) { /* 저장 불가 시 이번 방문에만 유지 */ } }
+function streakOf(today) {
+  const r = records();
+  let k = r[today] && r[today].solved ? today : shift(today, -1);
+  let n = 0;
+  while (r[k] && r[k].solved) { n++; k = shift(k, -1); }
+  return n;
+}
+
+/* ───────────── 화면 ───────────── */
+const $ = id => document.getElementById(id);
+const slotEls = Array.prototype.slice.call(document.querySelectorAll('.slot'));
+let today = todayKST();
+let cur = today;
+let problem = null;
+let digits = '';
+let status = 'idle'; // idle | wrong | solved
+let tries = 0;
+let note = '';
+
+function firstDay() { return LAUNCH_DATE < today ? LAUNCH_DATE : today; }
+function keyFromHash() {
+  const h = location.hash.slice(1);
+  if (!parseKey(h)) return today;
+  if (h > today) return today;
+  if (h < firstDay()) return firstDay();
+  return h;
+}
+function getProblem(key) {
+  const p = parseKey(key);
+  return PROBLEMS[key] || PROBLEMS[`${pad(p.mo)}-${pad(p.d)}`] || sampleProblem(p.mo, p.d);
+}
+
+function show(key) {
+  cur = key;
+  problem = getProblem(key);
+  const p = parseKey(key);
+  const rec = records()[key] || {};
+  tries = rec.tries || 0;
+  status = rec.solved ? 'solved' : 'idle';
+  digits = rec.solved ? String(problem.answer) : '';
+  note = '';
+
+  $('dateMain').textContent = `${p.mo}월 ${p.d}일`;
+  $('dateSub').textContent = `${p.y}년 ${WD[p.wd]}요일` + (key === today ? ' · 오늘' : '');
+  $('no').textContent = `${p.d}.`;
+
+  let h = lines(problem.stem);
+  if (problem.conditions && problem.conditions.length) h += `<div class="cond">${problem.conditions.map(c => `<p>${rich(c)}</p>`).join('')}</div>`;
+  if (problem.points) h += `<p class="pts">[${problem.points}점]</p>`;
+  $('body').innerHTML = h;
+  $('figure').innerHTML = problem.figure || '';
+  $('solBody').innerHTML = problem.solution ? lines(problem.solution) : '<p>해설이 준비되지 않았습니다.</p>';
+  $('doneAns').textContent = problem.answer;
+
+  draw();
+  tick();
+}
+
+function message() {
+  if (note) return note;
+  if (status === 'solved') return tries <= 1 ? '정답입니다. 한 번에 맞혔어요.' : `정답입니다. ${tries}번째 시도에 맞혔어요.`;
+  if (status === 'wrong') return `틀렸어요. 다시 풀어 보세요. · 시도 ${tries}회`;
+  if (tries > 0) return `아직 풀지 못했어요. · 시도 ${tries}회`;
+  return '답을 입력하고 제출을 누르세요.';
+}
+
+function draw() {
+  const ds = digits.padStart(3, ' ');
+  slotEls.forEach((el, i) => { el.querySelector('.slot-digit').textContent = ds[i] === ' ' ? '' : ds[i]; });
+  $('slots').setAttribute('aria-label', digits ? `입력한 답 ${digits}` : '입력한 답 없음');
+
+  const wrap = $('slotsWrap');
+  wrap.classList.toggle('is-wrong', status === 'wrong');
+  wrap.classList.toggle('is-solved', status === 'solved');
+  $('msg').textContent = message();
+
+  const solved = status === 'solved';
+  $('pad').hidden = solved;
+  $('done').hidden = !solved;
+  $('solution').hidden = !solved;
+  $('nextLine').hidden = cur !== today;
+  $('toToday').hidden = cur === today;
+
+  $('prev').disabled = cur <= firstDay();
+  $('next').disabled = cur >= today;
+  const n = streakOf(today);
+  $('streak').hidden = n === 0;
+  $('streakN').textContent = n;
+}
+
+function submit() {
+  if (status === 'solved') return;
+  if (!digits) { note = '답을 입력해 주세요.'; draw(); return; }
+  const all = records();
+  const r = all[cur] || { tries: 0, solved: false };
+  r.tries += 1;
+  tries = r.tries;
+  if (Number(digits) === Number(problem.answer)) {
+    r.solved = true;
+    status = 'solved';
+  } else {
+    $('slotsWrap').classList.remove('is-wrong');
+    void $('slotsWrap').offsetWidth;
+    status = 'wrong';
+  }
+  all[cur] = r;
+  saveRecords();
+  draw();
+  if (status === 'solved') {
+    setTimeout(() => {
+      const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      try { $('solution').scrollIntoView({ block: 'nearest', behavior: reduce ? 'auto' : 'smooth' }); } catch (e) { /* 무시 */ }
+    }, 900);
+  }
+}
+
+function press(k) {
+  if (status === 'solved') return;
+  note = '';
+  if (k === 'ok') { submit(); return; }
+  if (k === 'del') {
+    digits = digits.slice(0, -1);
+    if (status === 'wrong') status = 'idle';
+    draw();
+    return;
+  }
+  if (status === 'wrong') { status = 'idle'; digits = ''; }
+  if (digits.length < 3) digits += k;
+  draw();
+}
+
+function go(k) {
+  if (k > today || k < firstDay()) return;
+  location.hash = k;
+}
+
+function tick() {
+  const t = todayKST();
+  if (t !== today) { today = t; show(keyFromHash()); return; }
+  if ($('done').hidden || cur !== today) return;
+  const s = secsToMidnightKST();
+  $('cd').textContent = [Math.floor(s / 3600), Math.floor((s % 3600) / 60), s % 60].map(pad).join(':');
+}
+
+$('pad').addEventListener('click', e => {
+  const b = e.target.closest('button');
+  if (b && b.dataset.k) press(b.dataset.k);
+});
+$('prev').addEventListener('click', () => go(shift(cur, -1)));
+$('next').addEventListener('click', () => go(shift(cur, 1)));
+$('toToday').addEventListener('click', () => go(today));
+document.addEventListener('keydown', e => {
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  if (/^[0-9]$/.test(e.key)) { press(e.key); return; }
+  if (e.key === 'Backspace') { press('del'); return; }
+  if (e.key === 'Enter') {
+    if (e.target && e.target.closest && e.target.closest('button')) return;
+    press('ok');
+  }
+});
+window.addEventListener('hashchange', () => show(keyFromHash()));
+setInterval(tick, 1000);
+show(keyFromHash());
+})();
+</script>
+
+</body>
+</html>
