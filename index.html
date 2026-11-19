@@ -119,6 +119,14 @@ button:focus-visible { outline: 2px solid var(--red); outline-offset: 2px; }
 .m .isym path { fill: none; stroke: currentColor; stroke-width: .07em; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
 .m .isym .dot { stroke-width: .105em; }
 .m .intg.tall .isym { width: .8em; height: 2.8em; }
+.m .op { display: inline-flex; flex-direction: column; align-items: center; margin-right: .2em; }
+.m .op.lm { vertical-align: baseline; }
+.m .op.sm { vertical-align: middle; }
+.m .op .fn { margin: 0; line-height: 1.2; }
+.m .opu, .m .opl { font-size: .72em; line-height: 1.15; white-space: nowrap; }
+.m .op.sm .opu, .m .op.sm .opl { min-height: 1.15em; }
+.m .sigma { flex: none; width: 1em; height: 1.3em; margin: .12em 0; overflow: visible; vertical-align: middle; }
+.m .sigma path { fill: none; stroke: currentColor; stroke-width: .07em; stroke-linejoin: miter; stroke-linecap: butt; vector-effect: non-scaling-stroke; }
 .m .intg .ss, .m .lr .ss { align-self: stretch; }
 .m .lr { display: inline-flex; align-items: stretch; vertical-align: middle; }
 .m .lr .in { padding: .1em .25em; }
@@ -373,6 +381,24 @@ function tex(s) {
     }
     return c1 === '^' ? `<sup>${tex(sup)}</sup>` : `<sub>${tex(sub)}</sub>`;
   };
+  // lim, Σ 처럼 위·아래에 끝값이 놓이는 기호용. 연달아 오는 ^ 와 _ 를 {sup, sub} 로 돌려준다.
+  const parts = () => {
+    let j = i;
+    while (s[j] === ' ') j++;
+    const c1 = s[j];
+    if (c1 !== '^' && c1 !== '_') return null;
+    const r = { sup: null, sub: null };
+    i = j + 1;
+    r[c1 === '^' ? 'sup' : 'sub'] = arg();
+    j = i;
+    while (s[j] === ' ') j++;
+    const c2 = s[j];
+    if ((c2 === '^' || c2 === '_') && c2 !== c1) {
+      i = j + 1;
+      r[c2 === '^' ? 'sup' : 'sub'] = arg();
+    }
+    return r;
+  };
   while (i < s.length) {
     const c = s[i];
     if (c === ' ' || c === '\n') { i++; continue; }
@@ -430,6 +456,18 @@ function tex(s) {
         }
       } else if (name === 'right') {
         /* 짝이 없는 \right 는 무시 */
+      } else if (name === 'lim' || name === 'max' || name === 'min') {
+        const p = parts();
+        const fnHtml = `<span class="fn">${name}</span>`;
+        if (p && p.sub !== null) out += `<span class="op lm">${fnHtml}<span class="opl">${tex(p.sub)}</span></span>&#8288;`;
+        else out += fnHtml + (p && p.sup !== null ? `<sup>${tex(p.sup)}</sup>` : '');
+        last = 'open';
+      } else if (name === 'sum') {
+        const p = parts();
+        const sig = '<svg class="sigma" viewBox="0 0 60 80" preserveAspectRatio="none" aria-label="시그마" role="img"><path d="M48 14V6H10L34 40L10 74H48V66"/></svg>';
+        if (p) out += `<span class="op sm"><span class="opu">${p.sup === null ? '' : tex(p.sup)}</span>${sig}<span class="opl">${p.sub === null ? '' : tex(p.sub)}</span></span>&#8288;`;
+        else out += sig;
+        last = 'open';
       } else if (FUNCS.has(name)) {
         out += `<span class="fn">${name}</span>`;
         last = 'open';
@@ -438,7 +476,7 @@ function tex(s) {
         const sc = scripts();
         const rest = s.slice(i), eq = rest.indexOf('=');
         const tall = (eq < 0 ? rest : rest.slice(0, eq)).includes('\\frac');
-        out += `<span class="intg${tall ? ' tall' : ''}"><svg class="isym" viewBox="0 0 40 100" preserveAspectRatio="none" aria-label="적분" role="img"><path d="M33 10C33 3 24 0 23 12L17 88C16 100 7 97 7 90"/><path class="dot" d="M33 11h.01M7 89h.01"/></svg>${sc}</span>`;
+        out += `<span class="intg${tall ? ' tall' : ''}"><svg class="isym" viewBox="0 0 40 100" preserveAspectRatio="none" aria-label="적분" role="img"><path d="M33 10C33 3 24 0 23 12L17 88C16 100 7 97 7 90"/><path class="dot" d="M33 11h.01M7 89h.01"/></svg>${sc}</span>&#8288;`;
         last = 'open';
       } else if (SYMBOLS[name]) {
         const sy = SYMBOLS[name];
@@ -688,9 +726,10 @@ $('pad').addEventListener('click', e => {
   const b = e.target.closest('button');
   if (b && b.dataset.k) press(b.dataset.k);
 });
-$('prev').addEventListener('click', () => go(shift(cur, -1)));
-$('next').addEventListener('click', () => go(shift(cur, 1)));
-$('toToday').addEventListener('click', () => go(today));
+// 버튼을 누른 뒤에도 키보드 Enter 가 '제출'로 동작하도록 포커스를 풀어 준다.
+$('prev').addEventListener('click', e => { e.currentTarget.blur(); go(shift(cur, -1)); });
+$('next').addEventListener('click', e => { e.currentTarget.blur(); go(shift(cur, 1)); });
+$('toToday').addEventListener('click', e => { e.currentTarget.blur(); go(today); });
 document.addEventListener('keydown', e => {
   if (e.ctrlKey || e.metaKey || e.altKey) return;
   if (/^[0-9]$/.test(e.key)) { press(e.key); return; }
