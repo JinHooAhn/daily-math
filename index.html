@@ -110,6 +110,19 @@ button:focus-visible { outline: 2px solid var(--red); outline-offset: 2px; }
 .figure:not(:empty) { margin-top: 16px; display: flex; justify-content: center; overflow-x: auto; }
 .figure img { max-width: 100%; height: auto; }
 .state { margin: 0; color: var(--muted); font: 400 16px/1.7 var(--sans); }
+.preview { width: fit-content; max-width: 100%; margin: -6px auto 16px; padding: 3px 12px; border: 1px solid var(--red); background: var(--paper); color: var(--ink); font-size: 13px; text-align: center; }
+.m .ss { display: inline-flex; flex-direction: column; justify-content: space-between; vertical-align: middle; font-size: .72em; line-height: 1.15; min-height: 2.2em; }
+.m .ss sup, .m .ss sub { font-size: 1em; line-height: 1.15; vertical-align: baseline; }
+.m .intg { display: inline-flex; align-items: stretch; vertical-align: middle; margin-right: .15em; }
+.m .intg .sym { font-size: 1.75em; line-height: 1; }
+.m .intg .ss, .m .lr .ss { align-self: stretch; }
+.m .lr { display: inline-flex; align-items: stretch; vertical-align: middle; }
+.m .lr .in { padding: .1em .25em; }
+.m .lr .dl, .m .lr .dr { width: .28em; border: 1px solid currentColor; }
+.m .lr .dl.sq { border-right: 0; }
+.m .lr .dr.sq { border-left: 0; }
+.m .lr .bar { width: 0; border-width: 0 0 0 1px; }
+.m .lr .ch { width: auto; border: 0; align-self: center; }
 .pad.is-off { opacity: .4; pointer-events: none; }
 
 .sol-head { font: 700 14px/1.4 var(--sans); letter-spacing: .2em; padding-bottom: 8px; border-bottom: 1px solid var(--ink); margin-bottom: 12px; }
@@ -206,6 +219,8 @@ button:focus-visible { outline: 2px solid var(--red); outline-offset: 2px; }
     </div>
     <button type="button" class="navbtn" id="next" aria-label="다음 날">›</button>
   </nav>
+
+  <p class="preview" id="previewBar" hidden>미리보기 중입니다. 풀이 기록은 저장되지 않아요.</p>
 
   <main class="board">
     <section class="paper" aria-label="문제">
@@ -306,6 +321,7 @@ const OPS = new Set(['+', '−', '±', '∓', '≤', '≥', '≠', '×', '÷', '
 const SIGNS = new Set(['+', '−', '±', '∓']);
 const FUNCS = new Set(['sin', 'cos', 'tan', 'sec', 'csc', 'cot', 'log', 'ln', 'lim', 'max', 'min', 'exp']);
 const BRACE = '<svg class="brace" viewBox="0 0 10 100" preserveAspectRatio="none" aria-hidden="true"><path d="M9 1C5 1 5 4 5 10L5 40C5 46 3 50 1 50C3 50 5 54 5 60L5 90C5 96 5 99 9 99"/></svg>';
+const delim = (d, cls) => d === '.' ? '' : (d === '[' || d === ']') ? `<span class="${cls} sq"></span>` : d === '|' ? `<span class="${cls} bar"></span>` : `<span class="${cls} ch">${esc(d)}</span>`;
 const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 function group(s, i) {
@@ -332,16 +348,31 @@ function tex(s) {
     i += t.length;
     return t;
   };
+  // 위·아래 첨자. 연달아 오면 위아래로 겹쳐 쓴다(적분의 위끝·아래끝, 대괄호 뒤의 ]_0^3 등).
+  const scripts = () => {
+    let j = i;
+    while (s[j] === ' ') j++;
+    const c1 = s[j];
+    if (c1 !== '^' && c1 !== '_') return '';
+    i = j + 1;
+    let sup = '', sub = '';
+    const a1 = arg();
+    if (c1 === '^') sup = a1; else sub = a1;
+    j = i;
+    while (s[j] === ' ') j++;
+    const c2 = s[j];
+    if ((c2 === '^' || c2 === '_') && c2 !== c1) {
+      i = j + 1;
+      const a2 = arg();
+      if (c2 === '^') sup = a2; else sub = a2;
+      return `<span class="ss"><sup>${tex(sup)}</sup><sub>${tex(sub)}</sub></span>`;
+    }
+    return c1 === '^' ? `<sup>${tex(sup)}</sup>` : `<sub>${tex(sub)}</sub>`;
+  };
   while (i < s.length) {
     const c = s[i];
     if (c === ' ' || c === '\n') { i++; continue; }
-    if (c === '^' || c === '_') {
-      i++;
-      const a = arg();
-      const tag = c === '^' ? 'sup' : 'sub';
-      out += `<${tag}>${tex(a)}</${tag}>`;
-      continue;
-    }
+    if (c === '^' || c === '_') { out += scripts(); continue; }
     if (c === '\\') {
       const m = /^[a-zA-Z]+/.exec(s.slice(i + 1));
       if (!m) {
@@ -374,10 +405,32 @@ function tex(s) {
         const rows = env === 'cases' ? inner.split('\\\\').filter(r => r.trim()) : [];
         out += rows.length ? '<span class="cases">' + BRACE + '<span class="rows">' + rows.map(r => { const c = r.split('&'); return '<span>' + tex(c[0]) + '</span><span>' + tex(c[1] || '') + '</span>'; }).join('') + '</span></span>' : '';
         last = 'atom';
-      } else if (name === 'left' || name === 'right') {
-        /* 크기 지정은 무시 */
+      } else if (name === 'left') {
+        const d = arg();
+        let depth = 1, j = i, end = -1;
+        while (j < s.length) {
+          if (s.startsWith('\\left', j)) { depth++; j += 5; }
+          else if (s.startsWith('\\right', j)) { if (--depth === 0) { end = j; break; } j += 6; }
+          else j++;
+        }
+        if (end < 0) {
+          out += d === '.' ? '' : esc(d);
+          last = 'open';
+        } else {
+          const inner = s.slice(i, end);
+          i = end + 6;
+          const r = arg();
+          const sc = scripts();
+          out += '<span class="lr">' + delim(d, 'dl') + '<span class="in">' + tex(inner) + '</span>' + delim(r, 'dr') + sc + '</span>';
+          last = 'atom';
+        }
+      } else if (name === 'right') {
+        /* 짝이 없는 \right 는 무시 */
       } else if (FUNCS.has(name)) {
         out += `<span class="fn">${name}</span>`;
+        last = 'open';
+      } else if (name === 'int') {
+        out += '<span class="intg"><span class="sym">∫</span>' + scripts() + '</span>';
         last = 'open';
       } else if (SYMBOLS[name]) {
         const sy = SYMBOLS[name];
@@ -467,8 +520,13 @@ let tries = 0;
 let note = '';
 
 function firstDay() { return LAUNCH_DATE < today ? LAUNCH_DATE : today; }
+// 주소 끝에 #preview-2026-11-20 처럼 붙여 열면 아직 공개 전인 날의 문제를 미리 볼 수 있다(풀이 기록은 저장하지 않는다).
+let preview = false;
 function keyFromHash() {
   const h = location.hash.slice(1);
+  const pv = /^preview-(\d{4}-\d{2}-\d{2})$/.exec(h);
+  preview = !!(pv && parseKey(pv[1]));
+  if (preview) return pv[1];
   if (!parseKey(h)) return today;
   if (h > today) return today;
   if (h < firstDay()) return firstDay();
@@ -486,7 +544,7 @@ async function show(key) {
   note = '';
   const p = parseKey(key);
   $('dateMain').textContent = `${p.mo}월 ${p.d}일`;
-  $('dateSub').textContent = `${p.y}년 ${WD[p.wd]}요일` + (key === today ? ' · 오늘' : '');
+  $('dateSub').textContent = `${p.y}년 ${WD[p.wd]}요일` + (preview ? ' · 미리보기' : key === today ? ' · 오늘' : '');
   $('no').textContent = `${p.d}.`;
   $('body').innerHTML = '<p class="state">문제를 불러오는 중…</p>';
   $('figure').textContent = '';
@@ -509,7 +567,7 @@ async function show(key) {
   }
 
   problem = data;
-  const rec = records()[key] || {};
+  const rec = preview ? {} : (records()[key] || {});
   tries = rec.tries || 0;
   status = rec.solved ? 'solved' : 'idle';
   digits = rec.solved ? String(problem.answer) : '';
@@ -554,11 +612,12 @@ function draw() {
   $('pad').classList.toggle('is-off', !problem);
   $('done').hidden = !solved;
   $('solution').hidden = !solved;
-  $('nextLine').hidden = cur !== today;
-  $('toToday').hidden = cur === today;
+  $('nextLine').hidden = preview || cur !== today;
+  $('toToday').hidden = !preview && cur === today;
+  $('previewBar').hidden = !preview;
 
-  $('prev').disabled = cur <= firstDay();
-  $('next').disabled = cur >= today;
+  $('prev').disabled = preview || cur <= firstDay();
+  $('next').disabled = preview || cur >= today;
   const n = streakOf(today);
   $('streak').hidden = n === 0;
   $('streakN').textContent = n;
@@ -568,7 +627,7 @@ function submit() {
   if (!problem || status === 'solved') return;
   if (!digits) { note = '답을 입력해 주세요.'; draw(); return; }
   const all = records();
-  const r = all[cur] || { tries: 0, solved: false };
+  const r = preview ? { tries: tries, solved: false } : (all[cur] || { tries: 0, solved: false });
   r.tries += 1;
   tries = r.tries;
   if (Number(digits) === Number(problem.answer)) {
@@ -579,8 +638,7 @@ function submit() {
     void $('slotsWrap').offsetWidth;
     status = 'wrong';
   }
-  all[cur] = r;
-  saveRecords();
+  if (!preview) { all[cur] = r; saveRecords(); }
   draw();
   if (status === 'solved') {
     setTimeout(() => {
