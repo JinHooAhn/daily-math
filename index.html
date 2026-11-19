@@ -114,7 +114,9 @@ button:focus-visible { outline: 2px solid var(--red); outline-offset: 2px; }
 .m .ss { display: inline-flex; flex-direction: column; justify-content: space-between; vertical-align: middle; font-size: .72em; line-height: 1.15; min-height: 2.2em; }
 .m .ss sup, .m .ss sub { font-size: 1em; line-height: 1.15; vertical-align: baseline; }
 .m .intg { display: inline-flex; align-items: stretch; vertical-align: middle; margin-right: .15em; }
-.m .intg .sym { font-size: 1.75em; line-height: 1; }
+.m .isym { flex: none; width: .62em; height: 1.7em; overflow: visible; }
+.m .isym path { fill: none; stroke: currentColor; stroke-width: 4.5; stroke-linecap: round; stroke-linejoin: round; }
+.m .isym circle { fill: currentColor; }
 .m .intg .ss, .m .lr .ss { align-self: stretch; }
 .m .lr { display: inline-flex; align-items: stretch; vertical-align: middle; }
 .m .lr .in { padding: .1em .25em; }
@@ -430,7 +432,7 @@ function tex(s) {
         out += `<span class="fn">${name}</span>`;
         last = 'open';
       } else if (name === 'int') {
-        out += '<span class="intg"><span class="sym">∫</span>' + scripts() + '</span>';
+        out += '<span class="intg"><svg class="isym" viewBox="0 0 40 100" aria-label="적분" role="img"><path d="M33 10C33 3 24 0 23 12L17 88C16 100 7 97 7 90"/><circle cx="33" cy="11" r="3.4"/><circle cx="7" cy="89" r="3.4"/></svg>' + scripts() + '</span>';
         last = 'open';
       } else if (SYMBOLS[name]) {
         const sy = SYMBOLS[name];
