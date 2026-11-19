@@ -104,6 +104,7 @@ button:focus-visible { outline: 2px solid var(--red); outline-offset: 2px; }
 .no { font: 700 22px/1.55 var(--sans); font-variant-numeric: tabular-nums; }
 .item-body { font: 400 19px/2 var(--serif); }
 .item-body p, .sol-body p { margin: 0; }
+.item-body, .sol-body { word-break: keep-all; overflow-wrap: anywhere; }
 .item-body p + p { margin-top: .2em; }
 .cond { border: 1px solid var(--ink); padding: 10px 14px; margin: 14px 0 6px; }
 .pts { text-align: right; font-size: .9em; margin-top: 6px !important; }
@@ -115,8 +116,9 @@ button:focus-visible { outline: 2px solid var(--red); outline-offset: 2px; }
 .m .ss sup, .m .ss sub { font-size: 1em; line-height: 1.15; vertical-align: baseline; }
 .m .intg { display: inline-flex; align-items: stretch; vertical-align: middle; margin-right: .15em; }
 .m .isym { flex: none; width: .62em; height: 1.7em; overflow: visible; }
-.m .isym path { fill: none; stroke: currentColor; stroke-width: 4.5; stroke-linecap: round; stroke-linejoin: round; }
-.m .isym circle { fill: currentColor; }
+.m .isym path { fill: none; stroke: currentColor; stroke-width: .07em; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.m .isym .dot { stroke-width: .105em; }
+.m .intg.tall .isym { width: .8em; height: 2.8em; }
 .m .intg .ss, .m .lr .ss { align-self: stretch; }
 .m .lr { display: inline-flex; align-items: stretch; vertical-align: middle; }
 .m .lr .in { padding: .1em .25em; }
@@ -432,7 +434,11 @@ function tex(s) {
         out += `<span class="fn">${name}</span>`;
         last = 'open';
       } else if (name === 'int') {
-        out += '<span class="intg"><svg class="isym" viewBox="0 0 40 100" aria-label="적분" role="img"><path d="M33 10C33 3 24 0 23 12L17 88C16 100 7 97 7 90"/><circle cx="33" cy="11" r="3.4"/><circle cx="7" cy="89" r="3.4"/></svg>' + scripts() + '</span>';
+        // 피적분 함수에 분수가 있으면(= 앞까지 살펴본다) 기호를 분수 높이만큼 키운다.
+        const sc = scripts();
+        const rest = s.slice(i), eq = rest.indexOf('=');
+        const tall = (eq < 0 ? rest : rest.slice(0, eq)).includes('\\frac');
+        out += `<span class="intg${tall ? ' tall' : ''}"><svg class="isym" viewBox="0 0 40 100" preserveAspectRatio="none" aria-label="적분" role="img"><path d="M33 10C33 3 24 0 23 12L17 88C16 100 7 97 7 90"/><path class="dot" d="M33 11h.01M7 89h.01"/></svg>${sc}</span>`;
         last = 'open';
       } else if (SYMBOLS[name]) {
         const sy = SYMBOLS[name];
