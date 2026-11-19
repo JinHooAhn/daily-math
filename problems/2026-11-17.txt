@@ -1,0 +1,8 @@
+answer: 2
+---
+$\lim_{n\to\infty} \frac{1}{n^3}\sum_{k=1}^{n}(6k^2+k)$의 값은?
+---
+$\sum_{k=1}^{n}(6k^2+k)=6\cdot\frac{n(n+1)(2n+1)}{6}+\frac{n(n+1)}{2}$
+$=n(n+1)(2n+1)+\frac{n(n+1)}{2}$
+따라서 주어진 극한은
+$\lim_{n\to\infty}\frac{n(n+1)(2n+1)}{n^3}+\lim_{n\to\infty}\frac{n(n+1)}{2n^3}=2+0=2$
